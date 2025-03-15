@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Flesh Forge</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            text-align: center;
+            background-color: #1a0d0d;
+            color: #e6ccb3;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            background-color: #4a2c2c;
+            color: #ffcccc;
+            border: 2px solid #8c2d2d;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+        }
+        button:hover {
+            background-color: #6b3e3e;
+        }
+        button:disabled {
+            background-color: #2f1e1e;
+            color: #666;
+            cursor: not-allowed;
+        }
+        #game-container {
+            max-width: 800px;
+            margin: 20px auto;
+            border: 3px double #8c2d2d;
+            padding: 20px;
+            background-color: #2b1a1a;
+        }
+        .stats {
+            margin: 10px 0;
+            font-size: 1.2em;
+            text-shadow: 1px 1px 2px #000;
+        }
+        #narrative {
+            font-style: italic;
+            color: #ff9999;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <h1>The Flesh Forge</h1>
+        <div class="stats">
+            Humans: <span id="human-count">0</span><br>
+            Parts: <span id="part-count">0</span><br>
+            Parts per second: <span id="parts-per-second">0</span>
+        </div>
+        <button onclick="gatherParts()">Gather Parts</button><br>
+        <button onclick="forgeHuman()">Forge Human (Cost: 10 Parts)</button><br>
+        <button id="buy-loom" onclick="buyLoom()">Buy Flesh Loom (Cost: <span id="loom-cost">20</span> Parts)</button><br>
+        <div id="narrative">The shadows whisper... something stirs in the void.</div>
+    </div>
+
+    <script>
+        let parts = 0;
+        let humans = 0;
+        let looms = 0;
+        let loomCost = 20;
+        let partsPerSecond = 0;
+
+        // Narrative updates based on progress
+        const narrativeSteps = [
+            { humans: 1, text: "A single wretched form twitches to life." },
+            { humans: 5, text: "Their eyes are empty, yet they watch you." },
+            { humans: 10, text: "The air thickens with the stench of the unnameable." },
+            { humans: 25, text: "Something vast peers through the cracks of reality." }
+        ];
+
+        // Update display
+        function updateDisplay() {
+            document.getElementById('human-count').textContent = Math.floor(humans);
+            document.getElementById('part-count').textContent = Math.floor(parts);
+            document.getElementById('parts-per-second').textContent = partsPerSecond;
+            document.getElementById('loom-cost').textContent = Math.floor(loomCost);
+            document.getElementById('buy-loom').disabled = parts < loomCost;
+            document.getElementById('forge-human').disabled = parts < 10;
+
+            // Update narrative
+            for (let step of narrativeSteps) {
+                if (humans >= step.humans) {
+                    document.getElementById('narrative').textContent = step.text;
+                }
+            }
+        }
+
+        // Gather parts manually
+        function gatherParts() {
+            parts += 1;
+            updateDisplay();
+        }
+
+        // Forge a human
+        function forgeHuman() {
+            if (parts >= 10) {
+                parts -= 10;
+                humans += 1;
+                updateDisplay();
+            }
+        }
+
+        // Buy a flesh loom
+        function buyLoom() {
+            if (parts >= loomCost) {
+                parts -= loomCost;
+                looms += 1;
+                loomCost *= 1.2; // Cost increases exponentially
+                partsPerSecond = looms * 2; // 2 parts per second per loom
+                updateDisplay();
+            }
+        }
+
+        // Automation loop
+        setInterval(() => {
+            parts += partsPerSecond / 10; // Update 10 times per second
+            updateDisplay();
+        }, 100);
+    </script>
+</body>
+</html>
