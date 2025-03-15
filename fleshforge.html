@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Flesh Forge</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            text-align: center;
+            background-color: #1a0d0d;
+            color: #e6ccb3;
+            margin: 0;
+            padding: 0;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            background-color: #4a2c2c;
+            color: #ffcccc;
+            border: 2px solid #8c2d2d;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+        }
+        button:hover {
+            background-color: #6b3e3e;
+        }
+        button:disabled {
+            background-color: #2f1e1e;
+            color: #666;
+            cursor: not-allowed;
+        }
+        #game-container {
+            max-width: 800px;
+            margin: 20px auto;
+            border: 3px double #8c2d2d;
+            padding: 20px;
+            background-color: #2b1a1a;
+        }
+        .stats {
+            margin: 10px 0;
+            font-size: 1.2em;
+            text-shadow: 1px 1px 2px #000;
+        }
+        #narrative {
+            font-style: italic;
+            color: #ff9999;
+            margin: 15px 0;
+        }
+        #visual-container {
+            margin: 20px auto;
+            border: 2px solid #8c2d2d;
+            background-color: #000;
+        }
+        #event-log {
+            color: #ff6666;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <h1>The Flesh Forge</h1>
+        <div class="stats">
+            Humans: <span id="human-count">0</span><br>
+            Parts: <span id="part-count">0</span><br>
+            Parts per second: <span id="parts-per-second">0</span><br>
+            Sanity: <span id="sanity-count">100</span>
+        </div>
+        <button onclick="gatherParts()">Gather Parts</button><br>
+        <button id="forge-human" onclick="forgeHuman()">Forge Human (Cost: 10 Parts)</button><br>
+        <button id="buy-loom" onclick="buyLoom()">Buy Flesh Loom (Cost: <span id="loom-cost">20</span> Parts)</button><br>
+        <button id="buy-altar" onclick="buyAltar()">Sacrificial Altar (Cost: 50 Parts)</button><br>
+        <button id="buy-chanting" onclick="buyChanting()">Eldritch Chanting (Cost: 100 Parts)</button><br>
+        <div id="narrative">The shadows whisper... something stirs in the void.</div>
+        <div id="event-log"></div>
+    </div>
+    <div id="visual-container">
+        <canvas id="world-canvas" width="400" height="400"></canvas>
+    </div>
+
+    <script>
+        // Game state
+        let parts = 0;
+        let humans = 0;
+        let looms = 0;
+        let loomCost = 20;
+        let partsPerSecond = 0;
+        let sanity = 100;
+        let altarMultiplier = 1; // From Sacrificial Altar
+        let chantingMultiplier = 1; // From Eldritch Chanting
+        let oldOnesAwakened = 0; // Multiplier after reset
+        let partsPerHuman = 10; // Parts needed to forge a human
+
+        // Narrative updates
+        const narrativeSteps = [
+            { humans: 1, text: "A single wretched form twitches to life." },
+            { humans: 5, text: "Their eyes are empty, yet they watch you." },
+            { humans: 10, text: "The air thickens with the stench of the unnameable." },
+            { humans: 25, text: "Something vast peers through the cracks of reality." },
+            { humans: 100, text: "The Old Ones awaken! Reality frays... [RESET]" }
+        ];
+
+        // Random events
+        const randomEvents = [
+            { chance: 0.1, text: "A villager investigates!", effect: () => parts = Math.max(0, parts - 10) },
+            { chance: 0.05, text: "The stars align!", effect: () => parts += 20 },
+            { chance: 0.03, text: "Whispers drive you mad!", effect: () => sanity = Math.max(0, sanity - 5) }
+        ];
+
+        // Update display
+        function updateDisplay() {
+            document.getElementById('human-count').textContent = Math.floor(humans);
+            document.getElementById('part-count').textContent = Math.floor(parts);
+            document.getElementById('parts-per-second').textContent = partsPerSecond.toFixed(1);
+            document.getElementById('sanity-count').textContent = Math.floor(sanity);
+            document.getElementById('loom-cost').textContent = Math.floor(loomCost);
+            document.getElementById('buy-loom').disabled = parts < loomCost;
+            document.getElementById('forge-human').disabled = parts < partsPerHuman;
+            document.getElementById('buy-altar').disabled = parts < 50 || altarMultiplier > 1;
+            document.getElementById('buy-chanting').disabled = parts < 100 || chantingMultiplier > 1;
+
+            // Update narrative
+            for (let step of narrativeSteps) {
+                if (humans >= step.humans) {
+                    document.getElementById('narrative').textContent = step.text;
+                    if (humans >= 100) triggerOldOnes();
+                }
+            }
+        }
+
+        // Gather parts manually
+        function gatherParts() {
+            parts += 1 * altarMultiplier;
+            sanity -= 0.1;
+            updateDisplay();
+        }
+
+        // Forge a human
+        function forgeHuman() {
+            if (parts >= partsPerHuman) {
+                parts -= partsPerHuman;
+                humans += 1;
+                sanity -= 1;
+                updateDisplay();
+                drawWorld();
+            }
+        }
+
+        // Buy a flesh loom
+        function buyLoom() {
+            if (parts >= loomCost) {
+                parts -= loomCost;
+                looms += 1;
+                loomCost *= 1.2;
+                partsPerSecond = looms * 2 * chantingMultiplier;
+                sanity -= 2;
+                updateDisplay();
+                drawWorld();
+            }
+        }
+
+        // Buy Sacrificial Altar upgrade
+        function buyAltar() {
+            if (parts >= 50 && altarMultiplier === 1) {
+                parts -= 50;
+                altarMultiplier = 2;
+                sanity -= 5;
+                updateDisplay();
+            }
+        }
+
+        // Buy Eldritch Chanting upgrade
+        function buyChanting() {
+            if (parts >= 100 && chantingMultiplier === 1) {
+                parts -= 100;
+                chantingMultiplier = 2;
+                partsPerSecond = looms * 2 * chantingMultiplier;
+                sanity -= 10;
+                updateDisplay();
+            }
+        }
+
+        // Old Ones awaken (endgame reset)
+        function triggerOldOnes() {
+            oldOnesAwakened += 1;
+            parts = 0;
+            humans = 0;
+            looms = 0;
+            loomCost = 20;
+            partsPerSecond = 0;
+            sanity = 100;
+            altarMultiplier = 1;
+            chantingMultiplier = 1;
+            partsPerHuman = Math.floor(10 / (1 + oldOnesAwakened * 0.1));
+            updateDisplay();
+            drawWorld();
+        }
+
+        // Random events
+        setInterval(() => {
+            const roll = Math.random();
+            for (let event of randomEvents) {
+                if (roll < event.chance) {
+                    event.effect();
+                    document.getElementById('event-log').textContent = event.text;
+                    updateDisplay();
+                    break;
+                }
+            }
+        }, 15000);
+
+        // Automation loop
+        setInterval(() => {
+            parts += partsPerSecond / 10;
+            sanity -= partsPerSecond / 100;
+            sanity = Math.max(0, Math.min(100, sanity));
+            if (sanity <= 0) {
+                document.getElementById('event-log').textContent = "Your mind shatters! Efficiency halved.";
+                partsPerSecond *= 0.5;
+                sanity = 100;
+            }
+            updateDisplay();
+        }, 100);
+
+        // Visual Builder (8-bit Dante’s Inferno style)
+        const canvas = document.getElementById('world-canvas');
+        const ctx = canvas.getContext('2d');
+        const tileSize = 20; // 8-bit style tile size
+        const gridWidth = canvas.width / tileSize;
+        const gridHeight = canvas.height / tileSize;
+
+        function drawWorld() {
+            // Clear canvas
+            ctx.fillStyle = '#1a0d0d'; // Dark background
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw fiery ground (base layer)
+            for (let x = 0; x < gridWidth; x++) {
+                for (let y = 0; y < gridHeight; y++) {
+                    ctx.fillStyle = `rgb(${Math.random() * 50 + 150}, 50, 0)`; // Flickering red/orange
+                    ctx.fillRect(x * tileSize, y * tileSize, tileSize - 1, tileSize - 1);
+                }
+            }
+
+            // Draw humans as tormented souls
+            for (let i = 0; i < Math.min(humans, 50); i++) {
+                const x = Math.random() * (gridWidth - 1);
+                const y = Math.random() * (gridHeight - 1);
+                ctx.fillStyle = '#ff9999'; // Pale, fleshy color
+                ctx.fillRect(x * tileSize, y * tileSize, tileSize - 1, tileSize - 1);
+                ctx.fillStyle = '#000'; // Black eyes
+                ctx.fillRect(x * tileSize + 4, y * tileSize + 4, 4, 4);
+                ctx.fillRect(x * tileSize + 12, y * tileSize + 4, 4, 4);
+            }
+
+            // Draw looms as grotesque machines
+            for (let i = 0; i < looms; i++) {
+                const x = (i % 5) * 4 + 2;
+                const y = Math.floor(i / 5) * 4 + 2;
+                ctx.fillStyle = '#4a2c2c'; // Dark red machine
+                ctx.fillRect(x * tileSize, y * tileSize, tileSize * 2, tileSize * 2);
+                ctx.fillStyle = '#ff0000'; // Glowing red core
+                ctx.fillRect(x * tileSize + tileSize / 2, y * tileSize + tileSize / 2, tileSize / 2, tileSize / 2);
+            }
+
+            // Draw Old Ones influence
+            if (oldOnesAwakened > 0) {
+                ctx.fillStyle = `rgba(0, 0, 0, ${oldOnesAwakened * 0.2})`;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+
+        // Sound (Web Audio API)
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+
+        function playWhisper() {
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(200 + Math.random() * 50, audioCtx.currentTime);
+            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 2);
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 2);
+        }
+
+        // Play whispers randomly
+        setInterval(() => {
+            if (Math.random() < 0.2) playWhisper();
+        }, 10000);
+
+        // Initial draw
+        drawWorld();
+    </script>
+</body>
+</html>
