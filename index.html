@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>The Flesh Forge</title>
     <style>
         body {
@@ -14,14 +14,16 @@
             padding: 0;
         }
         button {
-            padding: 10px 20px;
-            margin: 5px;
+            padding: 15px 25px;
+            margin: 8px;
             cursor: pointer;
             background-color: #4a2c2c;
             color: #ffcccc;
             border: 2px solid #8c2d2d;
             border-radius: 5px;
             font-family: 'Courier New', monospace;
+            font-size: 1.1em;
+            touch-action: manipulation;
         }
         button:hover {
             background-color: #6b3e3e;
@@ -32,31 +34,40 @@
             cursor: not-allowed;
         }
         #game-container {
-            max-width: 800px;
-            margin: 20px auto;
+            max-width: 100%;
+            margin: 10px auto;
             border: 3px double #8c2d2d;
-            padding: 20px;
+            padding: 10px;
             background-color: #2b1a1a;
         }
         .stats {
             margin: 10px 0;
-            font-size: 1.2em;
+            font-size: 1.4em;
             text-shadow: 1px 1px 2px #000;
         }
         #narrative {
             font-style: italic;
             color: #ff9999;
             margin: 15px 0;
+            font-size: 1.2em;
         }
         #visual-container {
-            margin: 20px auto;
+            margin: 10px auto;
             border: 2px solid #8c2d2d;
             background-color: #000;
+            width: 100%;
+            max-width: 400px;
+        }
+        canvas#world-canvas {
+            width: 100%;
+            height: auto;
+            max-width: 400px;
+            max-height: 400px;
         }
         #event-log {
             color: #ff6666;
             margin: 10px 0;
-            font-size: 0.9em;
+            font-size: 1em;
         }
     </style>
 </head>
@@ -89,10 +100,10 @@
         let loomCost = 20;
         let partsPerSecond = 0;
         let sanity = 100;
-        let altarMultiplier = 1; // From Sacrificial Altar
-        let chantingMultiplier = 1; // From Eldritch Chanting
-        let oldOnesAwakened = 0; // Multiplier after reset
-        let partsPerHuman = 10; // Parts needed to forge a human
+        let altarMultiplier = 1;
+        let chantingMultiplier = 1;
+        let oldOnesAwakened = 0;
+        let partsPerHuman = 10;
 
         // Narrative updates
         const narrativeSteps = [
@@ -122,7 +133,6 @@
             document.getElementById('buy-altar').disabled = parts < 50 || altarMultiplier > 1;
             document.getElementById('buy-chanting').disabled = parts < 100 || chantingMultiplier > 1;
 
-            // Update narrative
             for (let step of narrativeSteps) {
                 if (humans >= step.humans) {
                     document.getElementById('narrative').textContent = step.text;
@@ -225,48 +235,71 @@
             updateDisplay();
         }, 100);
 
+        // Monster sprite (8x8, scaled to 20x20)
+        const monsterSprite = [
+            [0, 0, 1, 1, 1, 1, 0, 0],
+            [0, 1, 1, 2, 2, 1, 1, 0],
+            [1, 1, 2, 2, 2, 2, 1, 1],
+            [1, 1, 1, 3, 3, 1, 1, 1],
+            [0, 1, 1, 3, 3, 1, 1, 0],
+            [0, 0, 1, 1, 1, 1, 0, 0],
+            [0, 0, 1, 3, 1, 3, 0, 0],
+            [0, 0, 1, 1, 1, 1, 0, 0]
+        ];
+        const spriteColors = {
+            0: 'transparent',
+            1: '#ff9999', // Flesh
+            2: '#000',    // Black void
+            3: '#4a704a'  // Green ooze
+        };
+
         // Visual Builder (8-bit Dante’s Inferno style)
         const canvas = document.getElementById('world-canvas');
         const ctx = canvas.getContext('2d');
-        const tileSize = 20; // 8-bit style tile size
+        const tileSize = 20;
         const gridWidth = canvas.width / tileSize;
         const gridHeight = canvas.height / tileSize;
 
         function drawWorld() {
-            // Clear canvas
-            ctx.fillStyle = '#1a0d0d'; // Dark background
+            ctx.fillStyle = '#1a0d0d';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Draw fiery ground (base layer)
             for (let x = 0; x < gridWidth; x++) {
                 for (let y = 0; y < gridHeight; y++) {
-                    ctx.fillStyle = `rgb(${Math.random() * 50 + 150}, 50, 0)`; // Flickering red/orange
+                    ctx.fillStyle = `rgb(${Math.random() * 50 + 150}, 50, 0)`;
                     ctx.fillRect(x * tileSize, y * tileSize, tileSize - 1, tileSize - 1);
                 }
             }
 
-            // Draw humans as tormented souls
             for (let i = 0; i < Math.min(humans, 50); i++) {
                 const x = Math.random() * (gridWidth - 1);
                 const y = Math.random() * (gridHeight - 1);
-                ctx.fillStyle = '#ff9999'; // Pale, fleshy color
-                ctx.fillRect(x * tileSize, y * tileSize, tileSize - 1, tileSize - 1);
-                ctx.fillStyle = '#000'; // Black eyes
-                ctx.fillRect(x * tileSize + 4, y * tileSize + 4, 4, 4);
-                ctx.fillRect(x * tileSize + 12, y * tileSize + 4, 4, 4);
+                const pixelSize = tileSize / 8;
+                for (let sy = 0; sy < 8; sy++) {
+                    for (let sx = 0; sx < 8; sx++) {
+                        const color = spriteColors[monsterSprite[sy][sx]];
+                        if (color !== 'transparent') {
+                            ctx.fillStyle = color;
+                            ctx.fillRect(
+                                x * tileSize + sx * pixelSize,
+                                y * tileSize + sy * pixelSize,
+                                pixelSize,
+                                pixelSize
+                            );
+                        }
+                    }
+                }
             }
 
-            // Draw looms as grotesque machines
             for (let i = 0; i < looms; i++) {
                 const x = (i % 5) * 4 + 2;
                 const y = Math.floor(i / 5) * 4 + 2;
-                ctx.fillStyle = '#4a2c2c'; // Dark red machine
+                ctx.fillStyle = '#4a2c2c';
                 ctx.fillRect(x * tileSize, y * tileSize, tileSize * 2, tileSize * 2);
-                ctx.fillStyle = '#ff0000'; // Glowing red core
+                ctx.fillStyle = '#ff0000';
                 ctx.fillRect(x * tileSize + tileSize / 2, y * tileSize + tileSize / 2, tileSize / 2, tileSize / 2);
             }
 
-            // Draw Old Ones influence
             if (oldOnesAwakened > 0) {
                 ctx.fillStyle = `rgba(0, 0, 0, ${oldOnesAwakened * 0.2})`;
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -290,7 +323,6 @@
             oscillator.stop(audioCtx.currentTime + 2);
         }
 
-        // Play whispers randomly
         setInterval(() => {
             if (Math.random() < 0.2) playWhisper();
         }, 10000);
